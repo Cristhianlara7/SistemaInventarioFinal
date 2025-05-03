@@ -66,6 +66,16 @@
         exit();
     }
 
+    // Verificar IVA válido
+    if(!in_array($producto_iva, [0, 5, 19])){
+        echo '
+            <div class="notification is-danger is-light">
+                <strong>¡Ocurrió un error inesperado!</strong><br>
+                El porcentaje de IVA no es válido
+            </div>
+        ';
+        exit();
+    }
 
     /*== Verificando codigo ==*/
     $check_codigo=conexion();
@@ -191,9 +201,10 @@
 	}
 
 
-	/*== Guardando datos ==*/
+
+    /*== Guardando datos ==*/
     $guardar_producto=conexion();
-    $guardar_producto=$guardar_producto->prepare("INSERT INTO producto(producto_codigo,producto_nombre,producto_precio,producto_stock,producto_foto,categoria_id,usuario_id) VALUES(:codigo,:nombre,:precio,:stock,:foto,:categoria,:usuario)");
+    $guardar_producto=$guardar_producto->prepare("INSERT INTO producto(producto_codigo,producto_nombre,producto_precio,producto_stock,producto_foto,categoria_id,usuario_id,producto_iva) VALUES(:codigo,:nombre,:precio,:stock,:foto,:categoria,:usuario,:iva)");
 
     $marcadores=[
         ":codigo"=>$codigo,
@@ -202,7 +213,8 @@
         ":stock"=>$stock,
         ":foto"=>$foto,
         ":categoria"=>$categoria,
-        ":usuario"=>$_SESSION['id']
+        ":usuario"=>$_SESSION['id'],
+        ":iva"=>$producto_iva
     ];
 
     $guardar_producto->execute($marcadores);
@@ -231,27 +243,4 @@
     $guardar_producto=null;
 
 
-    // Verificar IVA válido
-    if(!in_array($producto_iva, [0, 5, 19])){
-        echo '
-            <div class="notification is-danger is-light">
-                <strong>¡Ocurrió un error inesperado!</strong><br>
-                El porcentaje de IVA no es válido
-            </div>
-        ';
-        exit();
-    }
-
-    // En la consulta SQL agregar el campo de IVA
-    $guardar_producto = conexion();
-    $guardar_producto = $guardar_producto->prepare("INSERT INTO producto(producto_codigo,producto_nombre,producto_precio,producto_stock,categoria_id,usuario_id,producto_iva) VALUES(:codigo,:nombre,:precio,:stock,:categoria,:usuario,:iva)");
-
-    $marcadores = [
-        ":codigo" => $codigo,
-        ":nombre" => $nombre,
-        ":precio" => $precio,
-        ":stock" => $stock,
-        ":categoria" => $categoria,
-        ":usuario" => $_SESSION['id'],
-        ":iva" => $producto_iva
-    ];
+   
