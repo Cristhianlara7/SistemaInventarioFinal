@@ -36,7 +36,7 @@ if(!$factura) {
 
 // Obtener detalles de la venta
 $stmt = $conexion->prepare("
-    SELECT vd.*, p.producto_nombre
+    SELECT vd.*, p.producto_nombre, p.producto_iva
     FROM venta_detalle vd
     INNER JOIN producto p ON vd.producto_id = p.producto_id
     WHERE vd.venta_id = ?
@@ -95,10 +95,19 @@ $xml_data = json_decode($factura['xml_contenido'], true);
                             $total_total = 0;
                             
                             foreach($detalles as $detalle): 
-                                $precio_sin_iva = round($detalle['detalle_precio'] / 1.19, 2);
+                                $precio = $detalle['detalle_precio'];
                                 $cantidad = $detalle['detalle_cantidad'];
+                                $porcentaje_iva = $detalle['producto_iva'] / 100; // Convertir porcentaje a decimal
+                                
+                                // Si el producto tiene IVA, calculamos el precio sin IVA
+                                if($porcentaje_iva > 0) {
+                                    $precio_sin_iva = $precio / (1 + $porcentaje_iva);
+                                } else {
+                                    $precio_sin_iva = $precio; // Si no tiene IVA, el precio es el mismo
+                                }
+                                
                                 $subtotal = $precio_sin_iva * $cantidad;
-                                $iva = $subtotal * 0.19;
+                                $iva = $subtotal * $porcentaje_iva;
                                 $total = $subtotal + $iva;
                                 
                                 $subtotal_total += $subtotal;
@@ -109,7 +118,13 @@ $xml_data = json_decode($factura['xml_contenido'], true);
                                 <td><?php echo $detalle['producto_nombre']; ?></td>
                                 <td><?php echo $cantidad; ?></td>
                                 <td>$<?php echo number_format($precio_sin_iva, 0, ',', '.'); ?></td>
-                                <td>$<?php echo number_format($iva, 0, ',', '.'); ?></td>
+                                <td><?php 
+                                    if($porcentaje_iva > 0) {
+                                        echo '$' . number_format($iva, 0, ',', '.') . ' (' . ($porcentaje_iva * 100) . '%)';
+                                    } else {
+                                        echo 'Exento';
+                                    }
+                                ?></td>
                                 <td>$<?php echo number_format($total, 0, ',', '.'); ?></td>
                             </tr>
                             <?php endforeach; ?>
@@ -122,7 +137,7 @@ $xml_data = json_decode($factura['xml_contenido'], true);
                             </tr>
                             <tr>
                                 <td colspan="3"></td>
-                                <td><strong>IVA (19%):</strong></td>
+                                <td><strong>IVA:</strong></td>
                                 <td>$<?php echo number_format($iva_total, 0, ',', '.'); ?></td>
                             </tr>
                             <tr>
