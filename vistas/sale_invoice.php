@@ -59,29 +59,24 @@
                     ");
                     $detalles->execute([$venta_id]);
                     
-                    foreach($detalles as $detalle) {
-                        $precio_con_iva = $detalle['detalle_precio'];
-                        $cantidad = $detalle['detalle_cantidad'];
-                        $porcentaje_iva = $detalle['producto_iva'];
-                        
-                        $total = $precio_con_iva * $cantidad;
-                        $subtotal = $total / (1 + ($porcentaje_iva/100));
-                        $iva = $total - $subtotal;
+                    while($detalle = $detalles->fetch()){
+                        $subtotal = $detalle['detalle_cantidad'] * $detalle['detalle_precio'];
+                        $iva = $subtotal * 0.19;
+                        $total = $subtotal + $iva;
                         
                         $subtotal_general += $subtotal;
                         $iva_general += $iva;
                         $total_general += $total;
-                        
-                        echo "
-                        <tr>
-                            <td>{$detalle['producto_nombre']}</td>
-                            <td>{$detalle['detalle_cantidad']}</td>
-                            <td>\$".number_format($detalle['detalle_precio'], 0, ',', '.')."</td>
-                            <td>{$detalle['producto_iva']}%</td>
-                            <td>\$".number_format($subtotal, 0, ',', '.')."</td>
-                            <td>\$".number_format($total, 0, ',', '.')."</td>
-                        </tr>
-                        ";
+                ?>
+                <tr>
+                    <td><?php echo $detalle['producto_nombre']; ?></td>
+                    <td><?php echo $detalle['detalle_cantidad']; ?></td>
+                    <td>$<?php echo number_format($detalle['detalle_precio'], 0, ',', '.'); ?></td>
+                    <td>$<?php echo number_format($iva, 0, ',', '.'); ?></td>
+                    <td>$<?php echo number_format($subtotal, 0, ',', '.'); ?></td>
+                    <td>$<?php echo number_format($total, 0, ',', '.'); ?></td>
+                </tr>
+                <?php
                     }
                 ?>
             </tbody>
@@ -91,11 +86,11 @@
                     <td colspan="2"><strong>$<?php echo number_format($subtotal_general, 0, ',', '.'); ?></strong></td>
                 </tr>
                 <tr>
-                    <td colspan="4" class="has-text-right"><strong>IVA Total:</strong></td>
+                    <td colspan="4" class="has-text-right"><strong>IVA (19%):</strong></td>
                     <td colspan="2"><strong>$<?php echo number_format($iva_general, 0, ',', '.'); ?></strong></td>
                 </tr>
                 <tr>
-                    <td colspan="4" class="has-text-right"><strong>Total con IVA:</strong></td>
+                    <td colspan="4" class="has-text-right"><strong>Total:</strong></td>
                     <td colspan="2"><strong>$<?php echo number_format($total_general, 0, ',', '.'); ?></strong></td>
                 </tr>
             </tfoot>

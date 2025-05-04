@@ -3,7 +3,76 @@
     <h2 class="subtitle">Nueva venta</h2>
 </div>
 
-<div class="container pb-6 pt-6">
+
+<div class="box mt-5">
+    <h2 class="title is-4">Datos del Cliente</h2>
+    <div class="columns is-multiline">
+        <div class="column is-6">
+            <div class="field">
+                <label class="label">Tipo de Identificación</label>
+                <div class="control">
+                    <div class="select is-fullwidth">
+                        <select id="tipoIdentificacion">
+                            <option value="13">Cédula de Ciudadanía</option>
+                            <option value="31">NIT</option>
+                            <option value="41">Pasaporte</option>
+                            <option value="42">Documento Extranjero</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="column is-6">
+            <div class="field">
+                <label class="label">Número de Identificación *</label>
+                <div class="control">
+                    <input class="input" type="text" id="numeroIdentificacion" required>
+                </div>
+            </div>
+        </div>
+        <div class="column is-6">
+            <div class="field">
+                <label class="label">Nombre/Razón Social *</label>
+                <div class="control">
+                    <input class="input" type="text" id="razonSocial" required>
+                </div>
+            </div>
+        </div>
+        <div class="column is-6">
+            <div class="field">
+                <label class="label">Dirección *</label>
+                <div class="control">
+                    <input class="input" type="text" id="direccion" required>
+                </div>
+            </div>
+        </div>
+        <div class="column is-6">
+            <div class="field">
+                <label class="label">Ciudad</label>
+                <div class="control">
+                    <input class="input" type="text" id="ciudad">
+                </div>
+            </div>
+        </div>
+        <div class="column is-6">
+            <div class="field">
+                <label class="label">Teléfono</label>
+                <div class="control">
+                    <input class="input" type="text" id="telefono">
+                </div>
+            </div>
+        </div>
+        <div class="column is-6">
+            <div class="field">
+                <label class="label">Email</label>
+                <div class="control">
+                    <input class="input" type="email" id="email">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container pb-6 pt-6">
     <div class="columns">
         <div class="column">
             <div class="field">
@@ -15,6 +84,9 @@
 
             <div id="resultados_busqueda" class="mt-3"></div>
         </div>
+    
+</div>
+
         <div class="column">
             <h3 class="title is-4">Carrito de Venta</h3>
             <div id="carrito_venta">
@@ -174,26 +246,50 @@ document.addEventListener('DOMContentLoaded', function() {
         actualizarCarrito();
     }
 
+    // Reemplazar el evento click existente con la nueva función
     document.getElementById('procesar_venta').addEventListener('click', function() {
         if(carrito.length === 0) {
             alert('El carrito está vacío');
             return;
         }
 
+        // Validar campos requeridos del cliente
+        const numeroIdentificacion = document.getElementById('numeroIdentificacion').value;
+        const razonSocial = document.getElementById('razonSocial').value;
+        const direccion = document.getElementById('direccion').value;
+
+        if (!numeroIdentificacion || !razonSocial || !direccion) {
+            alert('Por favor complete los campos obligatorios del cliente');
+            return;
+        }
+
+        // Preparar datos del cliente
+        const datosCliente = {
+            tipoIdentificacion: document.getElementById('tipoIdentificacion').value,
+            numeroIdentificacion: numeroIdentificacion,
+            razonSocial: razonSocial,
+            direccion: direccion,
+            ciudad: document.getElementById('ciudad').value,
+            telefono: document.getElementById('telefono').value,
+            email: document.getElementById('email').value
+        };
+
+        // Enviar datos de venta
         fetch('./php/venta_procesar.php', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify(carrito)
+            body: JSON.stringify({
+                carrito: carrito,
+                cliente: datosCliente
+            })
         })
         .then(response => response.json())
         .then(data => {
             if(data.status === 'success') {
-                // Procesamos la venta exitosa
                 alert('Venta procesada correctamente');
                 
-                // Manejamos la alerta de stock bajo si existe
                 if(data.alerta_stock && data.productos_stock_bajo.length > 0) {
                     let mensaje = 'ALERTA: Los siguientes productos tienen stock bajo:\n\n';
                     data.productos_stock_bajo.forEach(producto => {
@@ -203,17 +299,22 @@ document.addEventListener('DOMContentLoaded', function() {
                     alert(mensaje);
                 }
                 
-                // Limpiamos el carrito y redirigimos
                 carrito = [];
                 actualizarCarrito();
-                window.location.href = `index.php?vista=sale_invoice&venta_id=${data.venta_id}`;
+                
+                // Redirigir a la factura
+                if (data.factura && data.factura.url) {
+                    window.location.href = data.factura.url;
+                }
             } else {
                 alert('Error al procesar la venta: ' + data.message);
             }
         })
         .catch(error => {
             alert('Error al procesar la venta: ' + error.message);
+            console.error('Error:', error);
         });
     });
 });
+
 </script>
