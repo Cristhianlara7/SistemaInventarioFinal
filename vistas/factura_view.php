@@ -158,11 +158,8 @@ $xml_data = json_decode($factura['xml_contenido'], true);
                 </button>
             </p>
             <p class="control">
-                <a href="index.php?vista=sale_new" class="button">
-                    <span class="icon">
-                        <i class="fas fa-arrow-left"></i>
-                    </span>
-                    <span>Nueva Venta</span>
+                <a href="index.php?vista=sale_new" class="button is-link">
+                    Nueva Venta
                 </a>
             </p>
         </div>

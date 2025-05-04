@@ -1,119 +1,171 @@
+<?php
+require_once "./php/main.php";
+
+$venta_id = isset($_GET['venta_id']) ? limpiar_cadena($_GET['venta_id']) : 0;
+
+if($venta_id <= 0) {
+    echo '
+    <div class="notification is-danger">
+        ID de venta no válido
+    </div>
+    ';
+    exit;
+}
+
+$conexion = conexion();
+
+// Obtener datos de la factura
+$stmt = $conexion->prepare("
+    SELECT fe.*, v.venta_codigo, v.venta_fecha, v.venta_total, u.usuario_nombre, u.usuario_apellido
+    FROM factura_electronica fe
+    INNER JOIN venta v ON fe.venta_id = v.venta_id
+    INNER JOIN usuario u ON v.usuario_id = u.usuario_id
+    WHERE fe.venta_id = ?
+");
+$stmt->execute([$venta_id]);
+$factura = $stmt->fetch(PDO::FETCH_ASSOC);
+
+if(!$factura) {
+    echo '
+    <div class="notification is-danger">
+        Factura no encontrada
+    </div>
+    ';
+    exit;
+}
+
+// Obtener detalles de la venta
+$stmt = $conexion->prepare("
+    SELECT vd.*, p.producto_nombre
+    FROM venta_detalle vd
+    INNER JOIN producto p ON vd.producto_id = p.producto_id
+    WHERE vd.venta_id = ?
+");
+$stmt->execute([$venta_id]);
+$detalles = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Decodificar contenido XML
+$xml_data = json_decode($factura['xml_contenido'], true);
+?>
+
 <div class="container is-fluid mb-6">
-    <h1 class="title">Ventas</h1>
-    <h2 class="subtitle">Factura de venta</h2>
+    <h1 class="title">Factura de Venta</h1>
+    <h2 class="subtitle">Número: <?php echo $factura['numero_factura']; ?></h2>
 </div>
 
 <div class="container pb-6 pt-6">
-    <?php
-        require_once "./php/main.php";
-        
-        $venta_id = isset($_GET['venta_id']) ? limpiar_cadena($_GET['venta_id']) : 0;
-        
-        $conexion = conexion();
-        
-        // Obtener datos de la venta
-        $venta = $conexion->prepare("
-            SELECT v.*, u.usuario_nombre, u.usuario_apellido 
-            FROM venta v 
-            INNER JOIN usuario u ON v.usuario_id = u.usuario_id 
-            WHERE v.venta_id = ?
-        ");
-        $venta->execute([$venta_id]);
-        $venta = $venta->fetch();
-        
-        if($venta) {
-    ?>
     <div class="box">
+        <!-- Información del Emisor y Cliente -->
         <div class="columns">
-            <div class="column">
-                <p><strong>Código de Venta:</strong> <?php echo $venta['venta_codigo']; ?></p>
-                <p><strong>Fecha:</strong> <?php echo $venta['venta_fecha']; ?></p>
+            <div class="column is-6">
+                <h3 class="title is-5">Datos del Emisor</h3>
+                <p><strong>Razón Social:</strong> <?php echo $xml_data['Emisor']['RazonSocial']; ?></p>
+                <p><strong>NIT:</strong> <?php echo $xml_data['Emisor']['NIT']; ?></p>
+                <p><strong>Dirección:</strong> <?php echo $xml_data['Emisor']['DireccionFiscal'] ?? ''; ?></p>
+                <p><strong>Ciudad:</strong> <?php echo $xml_data['Emisor']['Ciudad'] ?? ''; ?></p>
             </div>
-            <div class="column">
-                <p><strong>Vendedor:</strong> <?php echo $venta['usuario_nombre'].' '.$venta['usuario_apellido']; ?></p>
+            <div class="column is-6">
+                <h3 class="title is-5">Datos del Cliente</h3>
+                <p><strong>Razón Social:</strong> <?php echo $xml_data['Cliente']['RazonSocial']; ?></p>
+                <p><strong>Identificación:</strong> <?php echo $xml_data['Cliente']['NumeroIdentificacion']; ?></p>
+                <p><strong>Dirección:</strong> <?php echo $xml_data['Cliente']['Direccion'] ?? ''; ?></p>
+                <p><strong>Ciudad:</strong> <?php echo $xml_data['Cliente']['Ciudad'] ?? ''; ?></p>
             </div>
         </div>
-        
-        <table class="table is-fullwidth mt-4">
-            <thead>
-                <tr>
-                    <th>Producto</th>
-                    <th>Cantidad</th>
-                    <th>Precio Unit.</th>
-                    <th>IVA</th>
-                    <th>Subtotal</th>
-                    <th>Total</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php
-                    $subtotal_general = 0;
-                    $iva_general = 0;
-                    $total_general = 0;
-                    
-                    $detalles = $conexion->prepare("
-                        SELECT vd.*, p.producto_nombre, p.producto_iva 
-                        FROM venta_detalle vd 
-                        INNER JOIN producto p ON vd.producto_id = p.producto_id 
-                        WHERE vd.venta_id = ?
-                    ");
-                    $detalles->execute([$venta_id]);
-                    
-                    while($detalle = $detalles->fetch()){
-                        $subtotal = $detalle['detalle_cantidad'] * $detalle['detalle_precio'];
-                        $iva = $subtotal * 0.19;
-                        $total = $subtotal + $iva;
-                        
-                        $subtotal_general += $subtotal;
-                        $iva_general += $iva;
-                        $total_general += $total;
-                ?>
-                <tr>
-                    <td><?php echo $detalle['producto_nombre']; ?></td>
-                    <td><?php echo $detalle['detalle_cantidad']; ?></td>
-                    <td>$<?php echo number_format($detalle['detalle_precio'], 0, ',', '.'); ?></td>
-                    <td>$<?php echo number_format($iva, 0, ',', '.'); ?></td>
-                    <td>$<?php echo number_format($subtotal, 0, ',', '.'); ?></td>
-                    <td>$<?php echo number_format($total, 0, ',', '.'); ?></td>
-                </tr>
-                <?php
-                    }
-                ?>
-            </tbody>
-            <tfoot>
-                <tr>
-                    <td colspan="4" class="has-text-right"><strong>Subtotal:</strong></td>
-                    <td colspan="2"><strong>$<?php echo number_format($subtotal_general, 0, ',', '.'); ?></strong></td>
-                </tr>
-                <tr>
-                    <td colspan="4" class="has-text-right"><strong>IVA (19%):</strong></td>
-                    <td colspan="2"><strong>$<?php echo number_format($iva_general, 0, ',', '.'); ?></strong></td>
-                </tr>
-                <tr>
-                    <td colspan="4" class="has-text-right"><strong>Total:</strong></td>
-                    <td colspan="2"><strong>$<?php echo number_format($total_general, 0, ',', '.'); ?></strong></td>
-                </tr>
-            </tfoot>
-        </table>
-        
-        <div class="field is-grouped is-grouped-right mt-4">
+
+        <!-- Detalles de la Factura -->
+        <div class="columns mt-5">
+            <div class="column is-12">
+                <h3 class="title is-5">Detalles de la Factura</h3>
+                <div class="table-container">
+                    <table class="table is-fullwidth is-striped">
+                        <thead>
+                            <tr>
+                                <th>Producto</th>
+                                <th>Cantidad</th>
+                                <th>Precio Unit.</th>
+                                <th>IVA</th>
+                                <th>Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php 
+                            $subtotal_total = 0;
+                            $iva_total = 0;
+                            $total_total = 0;
+                            
+                            foreach($detalles as $detalle): 
+                                $precio_sin_iva = round($detalle['detalle_precio'] / 1.19, 2);
+                                $cantidad = $detalle['detalle_cantidad'];
+                                $subtotal = $precio_sin_iva * $cantidad;
+                                $iva = $subtotal * 0.19;
+                                $total = $subtotal + $iva;
+                                
+                                $subtotal_total += $subtotal;
+                                $iva_total += $iva;
+                                $total_total += $total;
+                            ?>
+                            <tr>
+                                <td><?php echo $detalle['producto_nombre']; ?></td>
+                                <td><?php echo $cantidad; ?></td>
+                                <td>$<?php echo number_format($precio_sin_iva, 0, ',', '.'); ?></td>
+                                <td>$<?php echo number_format($iva, 0, ',', '.'); ?></td>
+                                <td>$<?php echo number_format($total, 0, ',', '.'); ?></td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                                <td colspan="3"></td>
+                                <td><strong>Subtotal:</strong></td>
+                                <td>$<?php echo number_format($subtotal_total, 0, ',', '.'); ?></td>
+                            </tr>
+                            <tr>
+                                <td colspan="3"></td>
+                                <td><strong>IVA (19%):</strong></td>
+                                <td>$<?php echo number_format($iva_total, 0, ',', '.'); ?></td>
+                            </tr>
+                            <tr>
+                                <td colspan="3"></td>
+                                <td><strong>Total:</strong></td>
+                                <td>$<?php echo number_format($total_total, 0, ',', '.'); ?></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Información Adicional -->
+        <div class="columns mt-5">
+            <div class="column is-12">
+                <div class="field">
+                    <p><strong>CUFE:</strong> <?php echo $factura['cufe']; ?></p>
+                    <p><strong>Fecha de Emisión:</strong> <?php echo date('d/m/Y H:i:s', strtotime($factura['fecha_generacion'])); ?></p>
+                    <p><strong>Vendedor:</strong> <?php echo $factura['usuario_nombre'] . ' ' . $factura['usuario_apellido']; ?></p>
+                    <p><strong>Estado:</strong> <span class="tag is-success"><?php echo $factura['estado']; ?></span></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Botones de Acción -->
+        <div class="field is-grouped mt-5">
             <p class="control">
                 <button class="button is-info" onclick="window.print()">
-                    Imprimir
+                    <span class="icon">
+                        <i class="fas fa-print"></i>
+                    </span>
+                    <span>Imprimir</span>
                 </button>
             </p>
             <p class="control">
-                <a href="index.php?vista=sale_new" class="button is-link">
-                    Nueva Venta
+                <a href="index.php?vista=sale_list" class="button">
+                    <span class="icon">
+                        <i class="fas fa-arrow-left"></i>
+                    </span>
+                    <span>Volver a la Lista</span>
                 </a>
             </p>
         </div>
     </div>
-    <?php
-        } else {
-            echo '<p class="has-text-centered">No se encontró la venta solicitada</p>';
-        }
-        
-        $conexion = null;
-    ?>
 </div>
